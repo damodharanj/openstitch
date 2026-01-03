@@ -1,0 +1,22 @@
+{
+    "nodes": [
+        {
+            "id": "74f06269-0fb4-4803-8b24-dda0c16a97b6",
+            "position": {
+                "x": 100,
+                "y": 100
+            },
+            "data": {
+                "component": {
+                    "html": "<div>Test</div>",
+                    "width": 400,
+                    "height": 300
+                },
+                "label": "New Component"
+            },
+            "type": "stitch",
+            "width": 1534,
+            "height": 878
+        }
+    ]
+}

@@ -1,0 +1,52 @@
+{
+  "name": "open-stitch",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "module": "ES2022",
+  "scripts": {
+    "test": "vitest",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "tsx watch server/index.ts",
+    "server:prod": "tsx server/index.ts",
+    "client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.1",
+    "@ai-sdk/google": "^3.0.1",
+    "@ai-sdk/openai": "^3.0.1",
+    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@sinclair/typebox": "^0.34.43",
+    "ai": "^6.0.3",
+    "autoprefixer": "^10.4.23",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "juice": "^11.0.3",
+    "mongoose": "^9.0.2",
+    "ollama-ai-provider": "^1.2.0",
+    "postcss": "^8.5.6",
+    "satori": "^0.18.3",
+    "satori-html": "^0.3.2",
+    "tailwindcss": "^3.4.19",
+    "uuid": "^13.0.0",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "@types/node-fetch": "^2.6.13",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^9.2.1",
+    "node-fetch": "^3.3.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  }
+}
