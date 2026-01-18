@@ -22,6 +22,7 @@
     "@ai-sdk/openai": "^3.0.1",
     "@clerk/clerk-sdk-node": "^4.13.23",
     "@sinclair/typebox": "^0.34.43",
+    "@vitejs/plugin-react": "^5.1.2",
     "ai": "^6.0.3",
     "autoprefixer": "^10.4.23",
     "cors": "^2.8.5",
