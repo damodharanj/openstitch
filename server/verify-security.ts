@@ -10,7 +10,8 @@ const BASE_URL = 'http://localhost:5001';
 
 async function verify() {
     console.log('Connecting to DB...');
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/open-stitch');
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/open-stitch';
+    await mongoose.connect(mongoUri);
 
     try {
         const testUserId = `security-test-${uuidv4()}`;

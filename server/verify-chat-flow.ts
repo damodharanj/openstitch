@@ -12,7 +12,8 @@ const TEST_KEY = 'sk-proj-INVALID-KEY-FOR-TESTING-FLOW';
 
 async function verifyFlow() {
     console.log('Connecting to DB...');
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/open-stitch');
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/open-stitch';
+    await mongoose.connect(mongoUri);
 
     try {
         const testId = `flow-test-${uuidv4()}`;
