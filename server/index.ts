@@ -45,10 +45,18 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const startServer = async () => {
-    await connectDB();
-    app.listen(PORT, () => {
+    console.log('Starting server...');
+    app.listen(Number(PORT), '0.0.0.0', () => {
         console.log(`Server running on port ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV}`);
+        console.log(`Mongo URI defined: ${!!process.env.MONGO_URI}`);
     });
+
+    try {
+        await connectDB();
+    } catch (error) {
+        console.error('Failed to connect to DB:', error);
+    }
 };
 
 startServer();
