@@ -4,10 +4,11 @@ import { useProject } from '../../context/ProjectContext';
 import { api } from '../../lib/api';
 import { LLM_PROVIDERS } from '../../../../schema';
 import { useAuth } from '@clerk/clerk-react';
+import { Combobox } from '../ui/Combobox';
 
 interface Message {
     id: string;
-    role: 'user' | 'assistant' | 'system';
+    role: string;
     content: string;
 }
 
@@ -40,6 +41,13 @@ export function ChatInterface({ onNodeAdd }: ChatInterfaceProps) {
     }, [projectId, isSignedIn, getToken]);
 
     const [frameType, setFrameType] = useState<'desktop' | 'mobile'>('desktop');
+    const [customModelInput, setCustomModelInput] = useState('');
+
+    useEffect(() => {
+        if (user?.llmConfig?.activeModel) {
+            setCustomModelInput(user.llmConfig.activeModel);
+        }
+    }, [user?.llmConfig?.activeModel]);
 
     const handleSend = async () => {
         if (!input.trim() || !projectId || isLoading || !isSignedIn) return;
@@ -142,47 +150,51 @@ export function ChatInterface({ onNodeAdd }: ChatInterfaceProps) {
                         ))}
                     </select>
 
-                    <select
-                        value={user?.llmConfig?.activeModel || 'gpt-4o-mini'}
-                        onChange={(e) => updateUserConfig({ activeModel: e.target.value })}
-                        className="flex-1 text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                        {(user?.llmConfig?.activeProvider === 'openai' || !user?.llmConfig?.activeProvider) && (
-                            <>
-                                <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                <option value="gpt-4o">GPT-4o</option>
-                                <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                            </>
-                        )}
-                        {user?.llmConfig?.activeProvider === 'anthropic' && (
-                            <>
-                                <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                                <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                                <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-                            </>
-                        )}
-                        {user?.llmConfig?.activeProvider === 'google' && (
-                            <>
-                                <option value="models/gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
-                                <option value="models/gemini-pro">Gemini Pro</option>
-                            </>
-                        )}
-                        {user?.llmConfig?.activeProvider === 'ollama' && (
-                            <>
-                                <option value="llama3">Llama 3</option>
-                                <option value="mistral">Mistral</option>
-                                <option value="codellama">Code Llama</option>
-                            </>
-                        )}
-                        {user?.llmConfig?.activeProvider === 'openrouter' && (
-                            <>
-                                <option value="openai/gpt-4o">GPT-4o (OR)</option>
-                                <option value="anthropic/claude-3-opus">Claude 3 Opus (OR)</option>
-                                <option value="google/gemini-pro-1.5">Gemini Pro 1.5 (OR)</option>
-                            </>
-                        )}
-                    </select>
+                    {(() => {
+                        const getModelOptions = (provider: string) => {
+                            switch (provider) {
+                                case 'openai': return [
+                                    { label: 'GPT-4o Mini', value: 'gpt-4o-mini' },
+                                    { label: 'GPT-4o', value: 'gpt-4o' },
+                                    { label: 'GPT-4 Turbo', value: 'gpt-4-turbo' },
+                                    { label: 'GPT-3.5 Turbo', value: 'gpt-3.5-turbo' }
+                                ];
+                                case 'anthropic': return [
+                                    { label: 'Claude 3 Opus', value: 'claude-3-opus-20240229' },
+                                    { label: 'Claude 3 Sonnet', value: 'claude-3-sonnet-20240229' },
+                                    { label: 'Claude 3 Haiku', value: 'claude-3-haiku-20240307' }
+                                ];
+                                case 'google': return [
+                                    { label: 'Gemini 1.5 Pro', value: 'models/gemini-1.5-pro-latest' },
+                                    { label: 'Gemini Pro', value: 'models/gemini-pro' }
+                                ];
+                                case 'ollama': return [
+                                    { label: 'Llama 3', value: 'llama3' },
+                                    { label: 'Mistral', value: 'mistral' },
+                                    { label: 'Code Llama', value: 'codellama' }
+                                ];
+                                case 'openrouter': return [
+                                    { label: 'GPT-4o (OR)', value: 'openai/gpt-4o' },
+                                    { label: 'Claude 3 Opus (OR)', value: 'anthropic/claude-3-opus' },
+                                    { label: 'Gemini Pro 1.5 (OR)', value: 'google/gemini-pro-1.5' }
+                                ];
+                                default: return [];
+                            }
+                        };
+
+                        const activeProvider = user?.llmConfig?.activeProvider || 'openai';
+
+                        return (
+                            <Combobox
+                                value={customModelInput}
+                                onChange={setCustomModelInput}
+                                onBlur={() => updateUserConfig({ activeModel: customModelInput })}
+                                placeholder="Select or type model..."
+                                options={getModelOptions(activeProvider)}
+                                className="flex-1"
+                            />
+                        );
+                    })()}
                 </div>
             </div>
 

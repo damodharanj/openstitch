@@ -6,10 +6,9 @@ const ChatMessageSchema = new mongoose.Schema<ChatMessage>({
     id: { type: String, required: true },
     role: {
         type: String,
-        enum: ['user', 'assistant', 'system'],
         required: true
     },
-    content: { type: String, required: true },
+    content: { type: mongoose.Schema.Types.Mixed, required: true },
     timestamp: { type: Number, required: true },
 }, { _id: false });
 

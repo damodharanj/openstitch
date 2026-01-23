@@ -1,17 +1,13 @@
 import { Type, type Static } from '@sinclair/typebox';
 
-export const ChatRole = Type.Union([
-    Type.Literal('user'),
-    Type.Literal('assistant'),
-    Type.Literal('system')
-]);
+export const ChatRole = Type.String();
 
 export type ChatRole = Static<typeof ChatRole>;
 
 export const ChatMessage = Type.Object({
     id: Type.String(),
     role: ChatRole,
-    content: Type.String(),
+    content: Type.Any(),
     timestamp: Type.Number(),
 });
 

@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import { ChatModel } from '../models/Chat.js';
 import { ChatMessage, ChatRole, DEFAULT_SYSTEM_PROMPT } from '../../schema/chat.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -50,6 +51,8 @@ router.delete('/:projectId', async (req, res) => {
 router.post('/message', async (req, res) => {
     try {
         const { projectId, content, role } = req.body;
+
+
 
         if (!projectId || !content) {
             return res.status(400).json({ error: 'projectId and content are required' });
@@ -168,16 +171,83 @@ router.post('/message', async (req, res) => {
         // Generate assistant response using AI SDK
         const systemPrompt = user.llmConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
 
-        const result = await generateText({
-            model,
-            system: systemPrompt,
-            messages: chat.messages.map(m => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: m.content,
-            })),
-        });
+        const messagesPayload = chat.messages.reduce((acc: any[], m) => {
+            let content = m.content;
 
-        const assistantContent = result.text;
+            // Aggressive sanitization: Force EVERYTHING to be a string
+            let safeContent = '';
+
+            try {
+                if (typeof content === 'string') {
+                    safeContent = content;
+                } else if (Array.isArray(content)) {
+                    // Start by mapping to string representations
+                    safeContent = content.map((p: any) => {
+                        if (typeof p === 'string') return p;
+                        if (p && typeof p === 'object') {
+                            if (p.text) return p.text;
+                            // Fallback for other object types in array
+                            return JSON.stringify(p);
+                        }
+                        return String(p);
+                    }).join('\n');
+                } else if (content && typeof content === 'object') {
+                    // Handle single object case (rare but possible based on DB inspection)
+                    safeContent = JSON.stringify(content);
+                } else {
+                    safeContent = String(content || '');
+                }
+            } catch (e) {
+                console.error('Error sanitizing message content:', e);
+                safeContent = 'Error processing content';
+            }
+
+            const role = m.role === 'user' ? 'user' : 'assistant';
+
+            const lastMessage = acc[acc.length - 1];
+            if (lastMessage && lastMessage.role === role) {
+                // Coalesce with previous message of same role
+                lastMessage.content += '\n\n' + safeContent;
+            } else {
+                acc.push({
+                    role,
+                    content: safeContent,
+                });
+            }
+            return acc;
+        }, [] as any[])
+            .filter((m: any) => m.content && m.content.trim().length > 0); // Filter empty messages
+
+        // Strict final mapping to ensuring purely fresh objects
+        const strictPayload = messagesPayload
+            .filter((m: any) => m.content && String(m.content).trim().length > 0)
+            .map((m: any) => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: String(m.content)
+            }));
+
+        let assistantContent = '';
+
+        try {
+
+
+            // console.log('[DEBUG] Strict payload prepared with', strictPayload.length, 'messages');
+            try {
+                fs.writeFileSync('debug_strict_payload.json', JSON.stringify(strictPayload, null, 2));
+            } catch (e) { }
+
+            const result = await generateText({
+                model,
+                system: String(systemPrompt || ''), // Ensure primitive string
+                messages: strictPayload as any,
+            });
+
+            assistantContent = result.text;
+        } catch (genError: any) {
+            console.error('Generation error:', genError);
+            // Non-fatal, we will just have an empty assistant response if it fails entirely
+        }
+
 
         const assistantMessage: ChatMessage = {
             id: uuidv4(),
