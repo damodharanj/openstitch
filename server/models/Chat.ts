@@ -8,7 +8,7 @@ const ChatMessageSchema = new mongoose.Schema<ChatMessage>({
         type: String,
         required: true
     },
-    content: { type: mongoose.Schema.Types.Mixed, required: true },
+    content: { type: String, default: '' },
     timestamp: { type: Number, required: true },
 }, { _id: false });
 

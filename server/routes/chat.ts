@@ -10,7 +10,6 @@ import { generateText } from 'ai';
 import { openai, createOpenAI } from '@ai-sdk/openai';
 import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 import { google, createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOllama } from 'ollama-ai-provider';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -142,12 +141,6 @@ router.post('/message', async (req, res) => {
             const googleInstance = createGoogleGenerativeAI({ apiKey });
             model = googleInstance(activeModel || 'models/gemini-pro');
 
-        } else if (activeProvider === 'ollama') {
-            const baseUrl = user.llmConfig?.ollama?.baseUrl || 'http://localhost:11434/api';
-
-            const ollamaInstance = createOllama({ baseURL: baseUrl });
-            model = ollamaInstance(activeModel || 'llama3');
-
         } else if (activeProvider === 'openrouter') {
             const rawKey = user.llmConfig?.openrouter?.apiKey;
             if (!rawKey) throw new Error('OpenRouter API key not configured');
@@ -170,76 +163,43 @@ router.post('/message', async (req, res) => {
 
         // Generate assistant response using AI SDK
         const systemPrompt = user.llmConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
-
-        const messagesPayload = chat.messages.reduce((acc: any[], m) => {
-            let content = m.content;
-
-            // Aggressive sanitization: Force EVERYTHING to be a string
-            let safeContent = '';
-
-            try {
-                if (typeof content === 'string') {
-                    safeContent = content;
-                } else if (Array.isArray(content)) {
-                    // Start by mapping to string representations
-                    safeContent = content.map((p: any) => {
-                        if (typeof p === 'string') return p;
-                        if (p && typeof p === 'object') {
-                            if (p.text) return p.text;
-                            // Fallback for other object types in array
-                            return JSON.stringify(p);
-                        }
-                        return String(p);
-                    }).join('\n');
-                } else if (content && typeof content === 'object') {
-                    // Handle single object case (rare but possible based on DB inspection)
-                    safeContent = JSON.stringify(content);
-                } else {
-                    safeContent = String(content || '');
-                }
-            } catch (e) {
-                console.error('Error sanitizing message content:', e);
-                safeContent = 'Error processing content';
-            }
-
-            const role = m.role === 'user' ? 'user' : 'assistant';
-
-            const lastMessage = acc[acc.length - 1];
-            if (lastMessage && lastMessage.role === role) {
-                // Coalesce with previous message of same role
-                lastMessage.content += '\n\n' + safeContent;
-            } else {
-                acc.push({
-                    role,
-                    content: safeContent,
-                });
-            }
-            return acc;
-        }, [] as any[])
-            .filter((m: any) => m.content && m.content.trim().length > 0); // Filter empty messages
-
-        // Strict final mapping to ensuring purely fresh objects
-        const strictPayload = messagesPayload
-            .filter((m: any) => m.content && String(m.content).trim().length > 0)
-            .map((m: any) => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: String(m.content)
-            }));
-
         let assistantContent = '';
 
         try {
+            const messagesForAI = chat.messages
+                .filter(m => m.content && m.content.trim() !== '')
+                .map(m => {
+                    // Ensure role is one of the allowed types
+                    let role: 'user' | 'assistant' | 'system' = 'user';
+                    if (m.role === 'assistant') role = 'assistant';
+                    else if (m.role === 'system') role = 'system';
 
+                    // Strict content sanitization to handle potential dirty data (e.g. arrays)
+                    let cleanContent = '';
+                    const rawContent = m.content as any;
+                    if (typeof rawContent === 'string') {
+                        cleanContent = rawContent;
+                    } else if (Array.isArray(rawContent)) {
+                        // If it's an array (dirty data), join valid parts
+                        cleanContent = rawContent
+                            .map((c: any) => typeof c === 'string' ? c : JSON.stringify(c))
+                            .join(' ');
+                    } else if (rawContent) {
+                        cleanContent = String(rawContent);
+                    }
 
-            // console.log('[DEBUG] Strict payload prepared with', strictPayload.length, 'messages');
-            try {
-                fs.writeFileSync('debug_strict_payload.json', JSON.stringify(strictPayload, null, 2));
-            } catch (e) { }
+                    return {
+                        role,
+                        content: cleanContent || '', // Ensure content is string
+                    };
+                });
+
+            console.log('Sending messages to AI:', JSON.stringify(messagesForAI, null, 2));
 
             const result = await generateText({
                 model,
-                system: String(systemPrompt || ''), // Ensure primitive string
-                messages: strictPayload as any,
+                system: systemPrompt,
+                messages: messagesForAI,
             });
 
             assistantContent = result.text;
@@ -247,7 +207,6 @@ router.post('/message', async (req, res) => {
             console.error('Generation error:', genError);
             // Non-fatal, we will just have an empty assistant response if it fails entirely
         }
-
 
         const assistantMessage: ChatMessage = {
             id: uuidv4(),
