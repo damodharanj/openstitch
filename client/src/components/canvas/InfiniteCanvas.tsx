@@ -11,6 +11,7 @@ import ReactFlow, {
     type Edge as ReactFlowEdge,
     type OnMoveEnd,
     type Viewport,
+    type OnSelectionChangeParams,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { StitchNode } from './StitchNode';
@@ -22,6 +23,7 @@ interface InfiniteCanvasProps {
     onEdgesChange: OnEdgesChange;
     onConnect: OnConnect;
     onMoveEnd?: OnMoveEnd;
+    onSelectionChange?: (params: OnSelectionChangeParams) => void;
     defaultViewport?: Viewport;
 }
 
@@ -32,6 +34,7 @@ export function InfiniteCanvas({
     onEdgesChange,
     onConnect,
     onMoveEnd,
+    onSelectionChange,
     defaultViewport,
 }: InfiniteCanvasProps) {
     const nodeTypes = useMemo<NodeTypes>(() => ({ stitch: StitchNode }), []);
@@ -44,6 +47,7 @@ export function InfiniteCanvas({
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                onSelectionChange={onSelectionChange}
                 nodeTypes={nodeTypes}
                 fitView={!defaultViewport}
                 onMoveEnd={onMoveEnd}

@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { ChatInterface } from './ChatInterface';
 import { InfiniteCanvas } from '../canvas/InfiniteCanvas';
 import { CodeViewModal } from '../modals/CodeViewModal';
+import { InspectionPanel } from '../inspection/InspectionPanel';
 import { useProject } from '../../context/ProjectContext';
 import { api } from '../../lib/api';
 import { measureHtmlContent } from '../../utils/measureContent';
@@ -15,6 +16,7 @@ import {
     type Edge,
     type Node,
     type Viewport,
+    type OnSelectionChangeParams,
 } from 'reactflow';
 
 // Helper to clean node data before saving
@@ -56,6 +58,7 @@ export function CanvasLayout() {
     const [isCodeViewOpen, setIsCodeViewOpen] = useState(false);
     const [viewCodeContent, setViewCodeContent] = useState<string>('');
     const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
     const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
     const [initialViewport, setInitialViewport] = useState<{ x: number; y: number; zoom: number } | undefined>(undefined);
@@ -123,6 +126,14 @@ export function CanvasLayout() {
         }
     }, [editingNodeId, projectId, nodes, setNodes, getToken]);
 
+    const handleNodeUpdate = useCallback((nodeId: string, updates: Partial<Node>) => {
+        setNodes((prevNodes) =>
+            prevNodes.map((node) =>
+                node.id === nodeId ? { ...node, ...updates } : node
+            )
+        );
+    }, []);
+
     // Load project data
     useEffect(() => {
         if (!projectId || !isSignedIn) {
@@ -167,6 +178,14 @@ export function CanvasLayout() {
         (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
         [setEdges]
     );
+
+    const onSelectionChange = useCallback(({ nodes }: OnSelectionChangeParams) => {
+        if (nodes.length > 0) {
+            setSelectedNodeId(nodes[0].id);
+        } else {
+            setSelectedNodeId(null);
+        }
+    }, []);
 
     const handleAddNode = useCallback(async (html: string, frameType: 'desktop' | 'mobile' = 'desktop') => {
         if (!projectId) return;
@@ -263,10 +282,17 @@ export function CanvasLayout() {
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         onMoveEnd={onMoveEnd}
+                        onSelectionChange={onSelectionChange}
                         defaultViewport={initialViewport}
                     />
                 )}
             </div>
+
+            <InspectionPanel
+                nodes={nodes}
+                selectedNodeId={selectedNodeId}
+                onNodeUpdate={handleNodeUpdate}
+            />
 
             <CodeViewModal
                 isOpen={isCodeViewOpen}
