@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, Settings, Palette, Layout, Sparkles, Eye, List } from 'lucide-react';
+import { ChevronLeft, Settings, Palette, Layout, Sparkles, Eye, List, Copy, Code, Trash2 } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
 import type { Node } from 'reactflow';
 import { parseTailwindClasses, updateTailwindClass, type TailwindClass } from '../../utils/tailwindParser';
 import { TailwindClassRow } from './TailwindClassRow';
@@ -9,14 +10,21 @@ interface InspectionPanelProps {
     nodes: Node[];
     selectedNodeId: string | null;
     onNodeUpdate?: (nodeId: string, updates: Partial<Node>) => void;
+    onViewCode?: (id: string, code: string) => void;
+    onDeleteNode?: (nodeId: string) => void;
 }
 
-export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate }: InspectionPanelProps) {
+export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate, onViewCode, onDeleteNode }: InspectionPanelProps) {
+    const { getToken } = useAuth();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState<'design' | 'layout' | 'tailwind'>('tailwind');
     const [tailwindView, setTailwindView] = useState<'high-level' | 'details'>('high-level');
     const [showOnlyValues, setShowOnlyValues] = useState(true);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['colors', 'typography']));
+    const [isCopyingToFigma, setIsCopyingToFigma] = useState(false);
+    const [isCopyingHtml, setIsCopyingHtml] = useState(false);
+    const [isEditingHtml, setIsEditingHtml] = useState(false);
+    const [editedHtml, setEditedHtml] = useState('');
     
     const selectedNode = nodes.find(node => node.id === selectedNodeId);
 
@@ -67,6 +75,67 @@ export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate }: Inspect
         } else {
             setExpandedCategories(new Set());
         }
+    };
+
+    const handleCopyToFigma = async () => {
+        if (!selectedNode) return;
+        
+        try {
+            setIsCopyingToFigma(true);
+            const token = await getToken();
+            if (!token) throw new Error('Unauthenticated');
+            
+            const { api } = await import('../../lib/api');
+            const { svg } = await api.convertToFigmaSvg(token, selectedNode.data.component.html);
+            await navigator.clipboard.writeText(svg);
+            
+            // Optional: Show success feedback (you could integrate with a toast system)
+            console.log('Copied SVG to clipboard for Figma');
+        } catch (err) {
+            console.error('Failed to copy SVG to clipboard:', err);
+        } finally {
+            setTimeout(() => setIsCopyingToFigma(false), 2000);
+        }
+    };
+
+    const handleCopyHtml = async () => {
+        if (!selectedNode) return;
+        
+        try {
+            setIsCopyingHtml(true);
+            await navigator.clipboard.writeText(selectedNode.data.component.html);
+            console.log('Copied HTML to clipboard');
+        } catch (err) {
+            console.error('Failed to copy HTML to clipboard:', err);
+        } finally {
+            setTimeout(() => setIsCopyingHtml(false), 2000);
+        }
+    };
+
+    const handleEditHtml = () => {
+        if (!selectedNode) return;
+        setIsEditingHtml(true);
+        setEditedHtml(selectedNode.data.component.html);
+    };
+
+    const handleSaveHtml = () => {
+        if (!selectedNode || !onNodeUpdate) return;
+        
+        onNodeUpdate(selectedNode.id, {
+            data: {
+                ...selectedNode.data,
+                component: {
+                    ...selectedNode.data.component,
+                    html: editedHtml
+                }
+            }
+        });
+        setIsEditingHtml(false);
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditingHtml(false);
+        setEditedHtml('');
     };
 
     const getHighLevelDesign = () => {
@@ -141,7 +210,7 @@ export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate }: Inspect
 
     if (!selectedNode) {
         return (
-            <div className={`w-80 bg-white border-l border-slate-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-12' : ''}`}>
+            <div className={`bg-white border-l border-slate-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-12' : 'w-80'}`}>
                 <div className="flex items-center justify-between p-4 border-b border-slate-200">
                     <h3 className={`font-semibold text-slate-700 ${isCollapsed ? 'hidden' : ''}`}>Inspector</h3>
                     <button
@@ -168,7 +237,7 @@ export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate }: Inspect
     const nodeHeight = selectedNode.height || component.height || 300;
 
     return (
-        <div className={`w-80 bg-white border-l border-slate-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-12' : ''}`}>
+        <div className={`bg-white border-l border-slate-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-12' : 'w-80'}`}>
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
                 <h3 className={`font-semibold text-slate-700 ${isCollapsed ? 'hidden' : ''}`}>Inspector</h3>
@@ -182,16 +251,59 @@ export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate }: Inspect
 
             {!isCollapsed && (
                 <>
-                    {/* Node Info */}
+                    {/* Node Info with Toolbar */}
                     <div className="p-4 border-b border-slate-200 bg-slate-50">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                            <span className="font-medium text-slate-700 truncate">
+                            <span className="font-medium text-slate-700 truncate flex-1">
                                 {selectedNode.data.label || 'Component'}
                             </span>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 mb-3">
                             ID: {selectedNode.id}
+                        </div>
+                        
+                        {/* Quick Actions */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={handleCopyHtml}
+                                className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                                    isCopyingHtml
+                                        ? 'bg-green-100 text-green-700 border border-green-200'
+                                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                }`}
+                            >
+                                <Copy size={14} />
+                                {isCopyingHtml ? 'Copied!' : 'Copy HTML'}
+                            </button>
+
+                            <button
+                                onClick={handleCopyToFigma}
+                                className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                                    isCopyingToFigma
+                                        ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                }`}
+                            >
+                                <Copy size={14} />
+                                {isCopyingToFigma ? 'Copied!' : 'Copy SVG'}
+                            </button>
+
+                            <button
+                                onClick={() => onViewCode?.(selectedNode.id, selectedNode.data.component.html)}
+                                className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+                            >
+                                <Code size={14} />
+                                View Code
+                            </button>
+
+                            <button
+                                onClick={() => onDeleteNode?.(selectedNode.id)}
+                                className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-white text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                            >
+                                <Trash2 size={14} />
+                                Delete
+                            </button>
                         </div>
                     </div>
 
@@ -391,6 +503,8 @@ export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate }: Inspect
 
                         {activeTab === 'design' && (
                             <div className="p-4 space-y-4">
+
+
                                 {/* Label */}
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -410,16 +524,59 @@ export function InspectionPanel({ nodes, selectedNodeId, onNodeUpdate }: Inspect
                                     />
                                 </div>
 
-                                {/* HTML Preview */}
+                                {/* HTML Content */}
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        HTML Content
-                                    </label>
-                                    <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
-                                        <pre className="text-xs text-slate-600 font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
-                                            {component.html}
-                                        </pre>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-sm font-medium text-slate-700">
+                                            HTML Content
+                                        </label>
+                                        <button
+                                            onClick={isEditingHtml ? handleSaveHtml : handleEditHtml}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                                isEditingHtml
+                                                    ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
+                                                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
+                                            }`}
+                                        >
+                                            {isEditingHtml ? 'Save Changes' : 'Edit HTML'}
+                                        </button>
                                     </div>
+                                    
+                                    {isEditingHtml ? (
+                                        <div className="border border-slate-200 rounded-md overflow-hidden">
+                                            <textarea
+                                                value={editedHtml}
+                                                onChange={(e) => setEditedHtml(e.target.value)}
+                                                className="w-full px-3 py-2 text-xs font-mono bg-white border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-48"
+                                                placeholder="Edit HTML content..."
+                                            />
+                                            <div className="flex items-center justify-between p-3 bg-slate-50 border-t border-slate-200">
+                                                <span className="text-xs text-slate-500">
+                                                    {editedHtml.length} characters
+                                                </span>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={handleCancelEdit}
+                                                        className="px-3 py-1 text-xs text-slate-600 hover:text-slate-800 bg-white border border-slate-200 rounded-md transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={handleSaveHtml}
+                                                        className="px-3 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md transition-colors"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                                            <pre className="text-xs text-slate-600 font-mono whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+                                                {component.html}
+                                            </pre>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Quick Stats */}

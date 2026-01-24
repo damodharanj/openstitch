@@ -2,9 +2,15 @@ import { memo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Trash2, Code, MousePointerClick, Copy } from 'lucide-react';
 import { Handle, Position, NodeResizer, type NodeProps, useReactFlow } from 'reactflow';
-import type { NodeData } from '../../../../schema';
 
-interface ExtendedNodeData extends NodeData {
+interface ExtendedNodeData {
+    type: 'component';
+    component: {
+        html: string;
+        width?: number;
+        height?: number;
+    };
+    label?: string;
     onViewCode?: (id: string, code: string) => void;
 }
 

@@ -1,16 +1,61 @@
-import { Layers, Layout, Settings, FolderOpen, MessageSquare } from 'lucide-react';
+import { Layers, Layout, Settings, FolderOpen, MessageSquare, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { SettingsModal } from '../settings/SettingsModal';
+import { AddNodeModal } from '../modals/AddNodeModal';
 import { UserButton } from '@clerk/clerk-react';
+import type { Node } from 'reactflow';
 
 interface SidebarProps {
     isChatOpen?: boolean;
     onToggleChat?: () => void;
+    onAddNode?: (node: Node) => void;
 }
 
-export function Sidebar({ isChatOpen, onToggleChat }: SidebarProps) {
+export function Sidebar({ isChatOpen, onToggleChat, onAddNode }: SidebarProps) {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isAddNodeOpen, setIsAddNodeOpen] = useState(false);
+
+    const handleAddDataSource = (config: any) => {
+        if (!onAddNode) return;
+        
+        const newNode: Node = {
+            id: crypto.randomUUID(),
+            type: 'data_source',
+            position: { x: 100, y: 100 },
+            data: {
+                type: 'data_source',
+                dataSource: config,
+                label: `${config.type} Data Source`
+            }
+        };
+        
+        onAddNode(newNode);
+    };
+
+    const handleAddImage = async (file: File) => {
+        if (!onAddNode) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const src = event.target?.result as string;
+            const newNode: Node = {
+                id: crypto.randomUUID(),
+                type: 'image',
+                position: { x: 100, y: 100 },
+                data: {
+                    type: 'image',
+                    image: {
+                        src,
+                        alt: file.name
+                    },
+                    label: file.name.split('.')[0]
+                }
+            };
+            onAddNode(newNode);
+        };
+        reader.readAsDataURL(file);
+    };
 
     return (
         <div className="w-16 h-full bg-slate-900 flex flex-col items-center py-4 gap-6 text-slate-400">
@@ -28,6 +73,14 @@ export function Sidebar({ isChatOpen, onToggleChat }: SidebarProps) {
 
             <button className="p-2 hover:bg-slate-800 rounded-lg hover:text-white transition-colors" title="Layers">
                 <Layers size={24} />
+            </button>
+
+            <button 
+                onClick={() => setIsAddNodeOpen(true)}
+                className="p-2 hover:bg-slate-800 rounded-lg hover:text-white transition-colors" 
+                title="Add Node"
+            >
+                <Plus size={24} />
             </button>
 
             <button className="p-2 hover:bg-slate-800 rounded-lg hover:text-white transition-colors" title="Components">
@@ -57,6 +110,12 @@ export function Sidebar({ isChatOpen, onToggleChat }: SidebarProps) {
             </div>
 
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+            <AddNodeModal
+                isOpen={isAddNodeOpen}
+                onClose={() => setIsAddNodeOpen(false)}
+                onAddDataSource={handleAddDataSource}
+                onAddImage={handleAddImage}
+            />
         </div>
     );
 }

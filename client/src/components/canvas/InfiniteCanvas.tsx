@@ -15,6 +15,8 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { StitchNode } from './StitchNode';
+import { DataSourceNode } from './DataSourceNode';
+import { ImageNode } from './ImageNode';
 
 interface InfiniteCanvasProps {
     nodes: ReactFlowNode[];
@@ -37,7 +39,11 @@ export function InfiniteCanvas({
     onSelectionChange,
     defaultViewport,
 }: InfiniteCanvasProps) {
-    const nodeTypes = useMemo<NodeTypes>(() => ({ stitch: StitchNode }), []);
+    const nodeTypes = useMemo<NodeTypes>(() => ({
+        stitch: StitchNode,
+        data_source: DataSourceNode,
+        image: ImageNode,
+    }), []);
 
     return (
         <div className="w-full h-full bg-slate-50">

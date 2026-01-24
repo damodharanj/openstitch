@@ -134,6 +134,10 @@ export function CanvasLayout() {
         );
     }, []);
 
+    const handleDeleteNode = useCallback((nodeId: string) => {
+        setNodes((prevNodes) => prevNodes.filter((node) => node.id !== nodeId));
+    }, []);
+
     // Load project data
     useEffect(() => {
         if (!projectId || !isSignedIn) {
@@ -187,7 +191,7 @@ export function CanvasLayout() {
         }
     }, []);
 
-    const handleAddNode = useCallback(async (html: string, frameType: 'desktop' | 'mobile' = 'desktop') => {
+    const handleAddComponentNode = useCallback(async (html: string, frameType: 'desktop' | 'mobile' = 'desktop') => {
         if (!projectId) return;
 
         // Measure the actual content dimensions
@@ -259,18 +263,63 @@ export function CanvasLayout() {
         // Auto-save effect will pick this up
     }, [projectId, nodes, setNodes, handleViewCode]);
 
+    const handleAddNode = useCallback((node: Node) => {
+        const findNonOverlappingPosition = (existingNodes: Node[], w: number, h: number) => {
+            let x = 100;
+            let y = 100;
+            let collision = true;
+            let retries = 0;
+
+            while (collision && retries < 100) {
+                collision = false;
+                for (const existingNode of existingNodes) {
+                    const nodeW = existingNode.width || 250;
+                    const nodeH = existingNode.height || 150;
+
+                    if (
+                        x < existingNode.position.x + nodeW + 50 &&
+                        x + w + 50 > existingNode.position.x &&
+                        y < existingNode.position.y + nodeH + 50 &&
+                        y + h + 50 > existingNode.position.y
+                    ) {
+                        collision = true;
+                        x += 50;
+                        y += 50;
+                        break;
+                    }
+                }
+                retries++;
+            }
+            return { x, y };
+        };
+
+        const position = findNonOverlappingPosition(nodes, 250, 150);
+        const newNode = {
+            ...node,
+            position,
+            style: { width: 250, height: 150 }
+        };
+
+        const updatedNodes = [...nodes, newNode];
+        setNodes(updatedNodes);
+    }, [nodes, setNodes]);
+
     // State for Chat Visibility
     const [isChatOpen, setIsChatOpen] = useState(true);
 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
-            <Sidebar isChatOpen={isChatOpen} onToggleChat={() => setIsChatOpen(!isChatOpen)} />
+            <Sidebar 
+                isChatOpen={isChatOpen} 
+                onToggleChat={() => setIsChatOpen(!isChatOpen)} 
+                onAddNode={handleAddNode}
+            />
 
             <div className={`${isChatOpen ? 'block' : 'hidden'} h-full border-r border-slate-200 shadow-xl z-10 transition-all duration-300`}>
-                <ChatInterface
-                    onNodeAdd={handleAddNode}
-                    onClose={() => setIsChatOpen(false)}
-                />
+                    <ChatInterface
+                        onNodeAdd={handleAddComponentNode}
+                        onClose={() => setIsChatOpen(false)}
+                    />
             </div>
 
             <div className="flex-1 h-full relative">
@@ -292,6 +341,8 @@ export function CanvasLayout() {
                 nodes={nodes}
                 selectedNodeId={selectedNodeId}
                 onNodeUpdate={handleNodeUpdate}
+                onViewCode={handleViewCode}
+                onDeleteNode={handleDeleteNode}
             />
 
             <CodeViewModal
