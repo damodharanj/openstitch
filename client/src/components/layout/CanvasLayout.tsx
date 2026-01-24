@@ -5,6 +5,7 @@ import { InfiniteCanvas } from '../canvas/InfiniteCanvas';
 import { CodeViewModal } from '../modals/CodeViewModal';
 import { useProject } from '../../context/ProjectContext';
 import { api } from '../../lib/api';
+import { measureHtmlContent } from '../../utils/measureContent';
 import { useCallback, useEffect, useState } from 'react';
 import {
     useNodesState,
@@ -170,8 +171,17 @@ export function CanvasLayout() {
     const handleAddNode = useCallback(async (html: string, frameType: 'desktop' | 'mobile' = 'desktop') => {
         if (!projectId) return;
 
-        const width = frameType === 'mobile' ? 375 : 1024;
-        const height = frameType === 'mobile' ? 667 : 768;
+        // Measure the actual content dimensions
+        let width = frameType === 'mobile' ? 375 : 1024;
+        let height = frameType === 'mobile' ? 667 : 768;
+
+        try {
+            const measuredDimensions = await measureHtmlContent(html, frameType);
+            width = measuredDimensions.width;
+            height = measuredDimensions.height;
+        } catch (error) {
+            console.error('Failed to measure content dimensions, using defaults:', error);
+        }
 
         const findNonOverlappingPosition = (nodes: Node[], w: number, h: number) => {
             let x = 100;
