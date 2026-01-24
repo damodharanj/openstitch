@@ -27,7 +27,7 @@ export const StitchNode = memo(({ id, data, selected }: NodeProps<ExtendedNodeDa
       <head>
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-            body { margin: 0; padding: 0; overflow: hidden; }
+            body { margin: 0; padding: 0; overflow: ${isInteractive ? 'auto' : 'hidden'}; }
         </style>
       </head>
       <body>

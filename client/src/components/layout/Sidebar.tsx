@@ -1,10 +1,15 @@
-import { Layers, Layout, Settings, FolderOpen } from 'lucide-react';
+import { Layers, Layout, Settings, FolderOpen, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { SettingsModal } from '../settings/SettingsModal';
 import { UserButton } from '@clerk/clerk-react';
 
-export function Sidebar() {
+interface SidebarProps {
+    isChatOpen?: boolean;
+    onToggleChat?: () => void;
+}
+
+export function Sidebar({ isChatOpen, onToggleChat }: SidebarProps) {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     return (
@@ -28,6 +33,16 @@ export function Sidebar() {
             <button className="p-2 hover:bg-slate-800 rounded-lg hover:text-white transition-colors" title="Components">
                 <Layout size={24} />
             </button>
+
+            {onToggleChat && (
+                <button
+                    onClick={onToggleChat}
+                    className={`p-2 hover:bg-slate-800 rounded-lg transition-colors ${isChatOpen ? 'text-indigo-400 bg-slate-800' : 'hover:text-white'}`}
+                    title={isChatOpen ? "Close Chat" : "Open Chat"}
+                >
+                    <MessageSquare size={24} />
+                </button>
+            )}
 
             <div className="mt-auto flex flex-col gap-4 items-center">
                 <UserButton afterSignOutUrl="/" appearance={{ elements: { avatarBox: "w-8 h-8" } }} />

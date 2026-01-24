@@ -230,9 +230,20 @@ export function CanvasLayout() {
         // Auto-save effect will pick this up
     }, [projectId, nodes, setNodes, handleViewCode]);
 
+    // State for Chat Visibility
+    const [isChatOpen, setIsChatOpen] = useState(true);
+
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
-            <Sidebar />
+            <Sidebar isChatOpen={isChatOpen} onToggleChat={() => setIsChatOpen(!isChatOpen)} />
+
+            <div className={`${isChatOpen ? 'block' : 'hidden'} h-full border-r border-slate-200 shadow-xl z-10 transition-all duration-300`}>
+                <ChatInterface
+                    onNodeAdd={handleAddNode}
+                    onClose={() => setIsChatOpen(false)}
+                />
+            </div>
+
             <div className="flex-1 h-full relative">
                 {isLoaded && (
                     <InfiniteCanvas
@@ -246,7 +257,7 @@ export function CanvasLayout() {
                     />
                 )}
             </div>
-            <ChatInterface onNodeAdd={handleAddNode} />
+
             <CodeViewModal
                 isOpen={isCodeViewOpen}
                 onClose={() => setIsCodeViewOpen(false)}

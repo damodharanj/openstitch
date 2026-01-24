@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Send, Bot, Trash2, Loader2, Monitor, Smartphone } from 'lucide-react';
+import { Send, Bot, Trash2, Loader2, Monitor, Smartphone, X } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { api } from '../../lib/api';
 import { LLM_PROVIDERS } from '../../../../schema';
@@ -14,9 +14,10 @@ interface Message {
 
 interface ChatInterfaceProps {
     onNodeAdd?: (html: string, frameType: 'desktop' | 'mobile') => void;
+    onClose?: () => void;
 }
 
-export function ChatInterface({ onNodeAdd }: ChatInterfaceProps) {
+export function ChatInterface({ onNodeAdd, onClose }: ChatInterfaceProps) {
     const { projectId, user, updateUserConfig } = useProject();
     const { getToken, isSignedIn } = useAuth();
     const [input, setInput] = useState('');
@@ -105,19 +106,30 @@ export function ChatInterface({ onNodeAdd }: ChatInterfaceProps) {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white border-l border-slate-200 w-80 shadow-lg">
+        <div className="flex flex-col h-full bg-white border-r border-slate-200 w-80 shadow-lg">
             <div className="p-4 border-b border-slate-200 flex justify-between items-center">
                 <h2 className="font-semibold text-slate-800 flex items-center gap-2">
                     <Bot size={20} className="text-indigo-600" />
                     AI Assistant
                 </h2>
-                <button
-                    onClick={handleClearChat}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-md transition-colors"
-                    title="Clear Chat"
-                >
-                    <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={handleClearChat}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-md transition-colors"
+                        title="Clear Chat"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                            title="Close Chat"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-col gap-2">
