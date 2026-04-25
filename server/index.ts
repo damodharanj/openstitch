@@ -20,13 +20,9 @@ import { requireAuth } from './middleware/auth.js';
 
 // Routes
 // Public routes can remain unprotected or use withAuth if needed
-// @ts-expect-error - Express types mismatch between middleware and app
 app.use('/api/projects', requireAuth(), projectRoutes);
-// @ts-expect-error - Express types mismatch between middleware and app
 app.use('/api/chat', requireAuth(), chatRoutes);
-// @ts-expect-error - Express types mismatch between middleware and app
 app.use('/api/users', requireAuth(), userRoutes);
-// @ts-expect-error - Express types mismatch between middleware and app
 app.use('/api/convert', requireAuth(), converterRoutes);
 
 // Basic health check

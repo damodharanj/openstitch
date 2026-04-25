@@ -45,10 +45,7 @@ router.get('/me', async (req, res) => {
 
         // Mask sensitive data
         if (user.llmConfig) {
-            if (user.llmConfig.openai?.apiKey) user.llmConfig.openai.apiKey = MASKED_KEY;
-            if (user.llmConfig.anthropic?.apiKey) user.llmConfig.anthropic.apiKey = MASKED_KEY;
-            if (user.llmConfig.google?.apiKey) user.llmConfig.google.apiKey = MASKED_KEY;
-            if (user.llmConfig.openrouter?.apiKey) user.llmConfig.openrouter.apiKey = MASKED_KEY;
+            if (user.llmConfig.apiKey) user.llmConfig.apiKey = MASKED_KEY;
         }
 
         res.json(user);
@@ -64,12 +61,10 @@ router.put('/me/config', async (req, res) => {
         const id = getUserId(req);
         const {
             activeProvider,
-            openai,
-            anthropic,
-            google,
-            ollama,
-            openrouter,
-            activeModel
+            apiKey,
+            baseUrl,
+            activeModel,
+            systemPrompt
         } = req.body;
 
         const user = await UserModel.findOne({ id });
@@ -81,22 +76,11 @@ router.put('/me/config', async (req, res) => {
 
         if (activeProvider) user.llmConfig.activeProvider = activeProvider;
         if (activeModel) user.llmConfig.activeModel = activeModel;
+        if (baseUrl !== undefined) user.llmConfig.baseUrl = baseUrl;
+        if (systemPrompt !== undefined) user.llmConfig.systemPrompt = systemPrompt;
 
-        const encryptKey = (key: string | undefined, currentObj: any) => {
-            if (key && key !== MASKED_KEY) {
-                return { apiKey: encrypt(key) };
-            }
-            return currentObj; // Keep existing
-        };
-
-        if (openai?.apiKey) user.llmConfig.openai = encryptKey(openai.apiKey, user.llmConfig.openai);
-        if (anthropic?.apiKey) user.llmConfig.anthropic = encryptKey(anthropic.apiKey, user.llmConfig.anthropic);
-        if (google?.apiKey) user.llmConfig.google = encryptKey(google.apiKey, user.llmConfig.google);
-        if (openrouter?.apiKey) user.llmConfig.openrouter = encryptKey(openrouter.apiKey, user.llmConfig.openrouter);
-
-        if (ollama?.baseUrl) {
-            if (!user.llmConfig.ollama) user.llmConfig.ollama = { baseUrl: '' };
-            user.llmConfig.ollama.baseUrl = ollama.baseUrl;
+        if (apiKey && apiKey !== MASKED_KEY) {
+            user.llmConfig.apiKey = encrypt(apiKey);
         }
 
         await user.save();

@@ -9,15 +9,12 @@ const userSchema = new mongoose.Schema<User>({
     llmConfig: {
         activeProvider: {
             type: String,
-            enum: ['openai', 'anthropic', 'google', 'ollama', 'openrouter'],
-            default: 'openai'
+            enum: ['openai-compatible'],
+            default: 'openai-compatible'
         },
         activeModel: String,
-        openai: { apiKey: String },
-        anthropic: { apiKey: String },
-        google: { apiKey: String },
-        ollama: { baseUrl: String },
-        openrouter: { apiKey: String },
+        apiKey: String,
+        baseUrl: String,
         systemPrompt: String,
     }
 });

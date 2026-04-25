@@ -23,6 +23,7 @@ describe('Schema Verification', () => {
             id: 'n1',
             position: { x: 0, y: 0 },
             data: {
+                type: 'component',
                 component: {
                     html: '<div class="p-4">Hello</div>',
                     // css field removed per user request

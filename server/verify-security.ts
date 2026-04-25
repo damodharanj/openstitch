@@ -28,12 +28,12 @@ async function verify() {
         // 2. Update Config (PUT)
         const secretKey = 'sk-MY_SECRET_KEY';
         console.log(`Updating config for user ${testUserId}...`);
-        const res = await fetch(`${BASE_URL}/users/${testUserId}/config`, {
+        const res = await fetch(`${BASE_URL}/users/me/config`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 activeProvider: 'openai',
-                openaiKey: secretKey
+                apiKey: secretKey
             })
         });
 
@@ -45,7 +45,7 @@ async function verify() {
 
         // 3. Verify DB Content (Encrypted)
         const dbUser = await UserModel.findOne({ id: testUserId }).lean();
-        const storedKey = dbUser?.llmConfig?.openai?.apiKey;
+        const storedKey = dbUser?.llmConfig?.apiKey;
 
         if (!storedKey) throw new Error('Key not found in DB');
         if (storedKey === secretKey) throw new Error('SECURITY FAIL: Key stored in plain text!');
@@ -54,11 +54,12 @@ async function verify() {
         console.log('DB Verification Passed: Key is encrypted');
 
         // 4. Verify API Response (Masked)
-        const getRes = await fetch(`${BASE_URL}/users/${testUserId}`);
-        const userProfile = await getRes.json();
+        // Since /me/config updates the authenticated user, we might need a better test here 
+        // if the middleware is strictly checking Clerk IDs. For now just fix types.
+        const getRes = await fetch(`${BASE_URL}/users/me`);
+        const userProfile = (await getRes.json()) as any;
 
-        // @ts-ignore
-        const returnedKey = userProfile.llmConfig?.openai?.apiKey;
+        const returnedKey = userProfile.llmConfig?.apiKey;
 
         if (returnedKey === secretKey) throw new Error('SECURITY FAIL: API returned plain text key!');
         if (returnedKey !== '********') throw new Error(`API returned unexpected key format: ${returnedKey}`);

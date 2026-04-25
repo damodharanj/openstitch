@@ -1,17 +1,11 @@
 import express from 'express';
-import fs from 'fs';
 import { ChatModel } from '../models/Chat.js';
 import { ChatMessage, ChatRole, DEFAULT_SYSTEM_PROMPT } from '../../schema/chat.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ProjectModel } from '../models/Project.js';
 import { UserModel } from '../models/User.js';
 import { decrypt } from '../utils/encryption.js';
-import { generateText } from 'ai';
-import { openai, createOpenAI } from '@ai-sdk/openai';
-import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
-import { google, createGoogleGenerativeAI } from '@ai-sdk/google';
-import { z } from 'zod';
-
+import OpenAI from 'openai';
 const router = express.Router();
 
 // GET /chat/:projectId - Get chat history for a project
@@ -51,8 +45,6 @@ router.post('/message', async (req, res) => {
     try {
         const { projectId, content, role } = req.body;
 
-
-
         if (!projectId || !content) {
             return res.status(400).json({ error: 'projectId and content are required' });
         }
@@ -81,7 +73,7 @@ router.post('/message', async (req, res) => {
 
         await chat.save();
 
-        // --- Secure AI Model Initialization ---
+        // --- Standardized OpenAI Compatibility ---
         // 1. Get Project to find owner
         const project = await ProjectModel.findOne({ id: projectId });
         if (!project) {
@@ -94,118 +86,72 @@ router.post('/message', async (req, res) => {
             return res.status(404).json({ error: 'Project owner not found' });
         }
 
-        // 3. Determine Provider and Key
-        const activeProvider = user.llmConfig?.activeProvider || 'openai';
-        const activeModel = user.llmConfig?.activeModel;
-        let model: any;
+        const { activeProvider, activeModel, apiKey: encryptedKey, baseUrl } = user.llmConfig || {};
 
-        if (activeProvider === 'openai') {
-            const rawKey = user.llmConfig?.openai?.apiKey;
-            if (!rawKey) throw new Error('OpenAI API key not configured');
-            let apiKey = '';
+        // 3. Decrypt Key
+        let apiKey = '';
+        if (encryptedKey) {
             try {
-                apiKey = decrypt(rawKey);
+                apiKey = decrypt(encryptedKey);
             } catch (e) {
-                console.error('Failed to decrypt OpenAI key', e);
+                console.error('Failed to decrypt LLM key', e);
                 return res.status(400).json({ error: 'Invalid API Key configuration' });
             }
-
-            const openaiInstance = createOpenAI({ apiKey });
-            model = openaiInstance(activeModel || 'gpt-4o');
-
-        } else if (activeProvider === 'anthropic') {
-            const rawKey = user.llmConfig?.anthropic?.apiKey;
-            if (!rawKey) throw new Error('Anthropic API key not configured');
-            let apiKey = '';
-            try {
-                apiKey = decrypt(rawKey);
-            } catch (e) {
-                console.error('Failed to decrypt Anthropic key', e);
-                return res.status(400).json({ error: 'Invalid API Key configuration' });
-            }
-
-            const anthropicInstance = createAnthropic({ apiKey });
-            model = anthropicInstance(activeModel || 'claude-3-opus-20240229');
-
-        } else if (activeProvider === 'google') {
-            const rawKey = user.llmConfig?.google?.apiKey;
-            if (!rawKey) throw new Error('Google API key not configured');
-            let apiKey = '';
-            try {
-                apiKey = decrypt(rawKey);
-            } catch (e) {
-                console.error('Failed to decrypt Google key', e);
-                return res.status(400).json({ error: 'Invalid API Key configuration' });
-            }
-
-            const googleInstance = createGoogleGenerativeAI({ apiKey });
-            model = googleInstance(activeModel || 'models/gemini-pro');
-
-        } else if (activeProvider === 'openrouter') {
-            const rawKey = user.llmConfig?.openrouter?.apiKey;
-            if (!rawKey) throw new Error('OpenRouter API key not configured');
-            let apiKey = '';
-            try {
-                apiKey = decrypt(rawKey);
-            } catch (e) {
-                console.error('Failed to decrypt OpenRouter key', e);
-                return res.status(400).json({ error: 'Invalid API Key configuration' });
-            }
-
-            const openrouter = createOpenAI({
-                apiKey,
-                baseURL: 'https://openrouter.ai/api/v1'
-            });
-            model = openrouter(activeModel || 'openai/gpt-4o');
-        } else {
-            return res.status(400).json({ error: `Provider ${activeProvider} not supported` });
         }
 
-        // Generate assistant response using AI SDK
+        // Normalize baseURL for common providers if necessary
+        let normalizedBaseUrl = baseUrl || undefined;
+        if (normalizedBaseUrl) {
+            // Remove trailing slash
+            normalizedBaseUrl = normalizedBaseUrl.replace(/\/$/, '');
+            // If it's openrouter and missing /api/v1
+            if (normalizedBaseUrl.includes('openrouter.ai') && !normalizedBaseUrl.endsWith('/api/v1')) {
+                normalizedBaseUrl = 'https://openrouter.ai/api/v1';
+            }
+        }
+
+        console.log(`Initializing OpenAI client with baseURL: ${normalizedBaseUrl || 'default'}`);
+
+        // 4. Initialize OpenAI Client
+        const openai = new OpenAI({
+            apiKey: apiKey || 'no-key-provided',
+            baseURL: normalizedBaseUrl,
+        });
+
         const systemPrompt = user.llmConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
         let assistantContent = '';
 
         try {
-            const messagesForAI = chat.messages
-                .filter(m => m.content && m.content.trim() !== '')
-                .map(m => {
-                    // Ensure role is one of the allowed types
-                    let role: 'user' | 'assistant' | 'system' = 'user';
-                    if (m.role === 'assistant') role = 'assistant';
-                    else if (m.role === 'system') role = 'system';
+            const messagesForAI: any[] = chat.messages
+                .filter(m => m.content && String(m.content).trim() !== '')
+                .map(m => ({
+                    role: m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'system' : 'user'),
+                    content: String(m.content)
+                }));
 
-                    // Strict content sanitization to handle potential dirty data (e.g. arrays)
-                    let cleanContent = '';
-                    const rawContent = m.content as any;
-                    if (typeof rawContent === 'string') {
-                        cleanContent = rawContent;
-                    } else if (Array.isArray(rawContent)) {
-                        // If it's an array (dirty data), join valid parts
-                        cleanContent = rawContent
-                            .map((c: any) => typeof c === 'string' ? c : JSON.stringify(c))
-                            .join(' ');
-                    } else if (rawContent) {
-                        cleanContent = String(rawContent);
-                    }
+            console.log(`Sending messages to ${activeProvider || 'openai'} (${activeModel || 'default'}):`, JSON.stringify(messagesForAI, null, 2));
 
-                    return {
-                        role,
-                        content: cleanContent || '', // Ensure content is string
-                    };
-                });
-
-            console.log('Sending messages to AI:', JSON.stringify(messagesForAI, null, 2));
-
-            const result = await generateText({
-                model,
-                system: systemPrompt,
-                messages: messagesForAI,
+            const completion = await openai.chat.completions.create({
+                model: activeModel || 'gpt-4o',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    ...messagesForAI
+                ],
+                temperature: 0.7,
             });
 
-            assistantContent = result.text;
+            console.log('LLM RAW RESPONSE:', JSON.stringify(completion, null, 2));
+
+            const text = completion?.choices?.[0]?.message?.content;
+            if (text) {
+                assistantContent = text;
+            } else {
+                console.error('LLM response missing text:', JSON.stringify(completion, null, 2));
+                throw new Error('LLM provider returned an empty or malformed response.');
+            }
         } catch (genError: any) {
             console.error('Generation error:', genError);
-            // Non-fatal, we will just have an empty assistant response if it fails entirely
+            assistantContent = `Error generating response: ${genError.message || 'Unknown error'}`;
         }
 
         const assistantMessage: ChatMessage = {
@@ -217,9 +163,7 @@ router.post('/message', async (req, res) => {
 
         chat.messages.push(assistantMessage);
         chat.updatedAt = new Date();
-
         await chat.save();
-
 
         res.status(201).json(chat.messages);
     } catch (error: any) {

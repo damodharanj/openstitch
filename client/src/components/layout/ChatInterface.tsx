@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Send, Bot, Trash2, Loader2, Monitor, Smartphone, X } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { api } from '../../lib/api';
-import { LLM_PROVIDERS } from '../../../../schema';
 import { useAuth } from '@clerk/clerk-react';
-import { Combobox } from '../ui/Combobox';
 
 interface Message {
     id: string;
@@ -18,7 +16,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ onNodeAdd, onClose }: ChatInterfaceProps) {
-    const { projectId, user, updateUserConfig } = useProject();
+    const { projectId } = useProject();
     const { getToken, isSignedIn } = useAuth();
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -42,19 +40,11 @@ export function ChatInterface({ onNodeAdd, onClose }: ChatInterfaceProps) {
     }, [projectId, isSignedIn, getToken]);
 
     const [frameType, setFrameType] = useState<'desktop' | 'mobile'>('desktop');
-    const [customModelInput, setCustomModelInput] = useState('');
-
-    useEffect(() => {
-        if (user?.llmConfig?.activeModel) {
-            setCustomModelInput(user.llmConfig.activeModel);
-        }
-    }, [user?.llmConfig?.activeModel]);
 
     const handleSend = async () => {
         if (!input.trim() || !projectId || isLoading || !isSignedIn) return;
 
         const content = input; // Keep original for display
-        // Append context for the AI
         const prompt = `${content}\n\n[System Note: The user wants this component for a ${frameType} viewport. Ensure the design is responsive and suitable for ${frameType === 'desktop' ? 'large screens (1024px+)' : 'mobile screens (375px)'}.]`;
 
         setInput('');
@@ -81,7 +71,6 @@ export function ChatInterface({ onNodeAdd, onClose }: ChatInterfaceProps) {
 
         } catch (error) {
             console.error('Failed to send message:', error);
-            // TODO: Show error toast
         } finally {
             setIsLoading(false);
         }
@@ -100,8 +89,6 @@ export function ChatInterface({ onNodeAdd, onClose }: ChatInterfaceProps) {
     };
 
     const formatMessageContent = (content: string) => {
-        // Remove the fenced code blocks that are used for node generation
-        // Specifically replacing the HTML blocks that we extracted
         return content.replace(/```html\s*[\s\S]*?\s*```/g, '*(Code rendered on canvas)*');
     };
 
@@ -132,90 +119,11 @@ export function ChatInterface({ onNodeAdd, onClose }: ChatInterfaceProps) {
                 </div>
             </div>
 
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-col gap-2">
-                <div className="flex gap-2">
-                    <select
-                        value={user?.llmConfig?.activeProvider || 'openai'}
-                        onChange={(e) => {
-                            const newProvider = e.target.value;
-                            // Default models for providers
-                            const defaultModels: Record<string, string> = {
-                                openai: 'gpt-4o-mini',
-                                anthropic: 'claude-3-opus-20240229',
-                                google: 'models/gemini-1.5-pro-latest',
-                                openrouter: 'openai/gpt-4o',
-                                ollama: 'llama3'
-                            };
-                            updateUserConfig({
-                                activeProvider: newProvider,
-                                activeModel: defaultModels[newProvider] || ''
-                            });
-                        }}
-                        className="flex-1 text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                        {LLM_PROVIDERS.map(provider => (
-                            <option key={provider} value={provider}>
-                                {provider === 'openai' ? 'OpenAI' :
-                                    provider === 'openrouter' ? 'OpenRouter' :
-                                        provider.charAt(0).toUpperCase() + provider.slice(1)}
-                            </option>
-                        ))}
-                    </select>
-
-                    {(() => {
-                        const getModelOptions = (provider: string) => {
-                            switch (provider) {
-                                case 'openai': return [
-                                    { label: 'GPT-4o Mini', value: 'gpt-4o-mini' },
-                                    { label: 'GPT-4o', value: 'gpt-4o' },
-                                    { label: 'GPT-4 Turbo', value: 'gpt-4-turbo' },
-                                    { label: 'GPT-3.5 Turbo', value: 'gpt-3.5-turbo' }
-                                ];
-                                case 'anthropic': return [
-                                    { label: 'Claude 3 Opus', value: 'claude-3-opus-20240229' },
-                                    { label: 'Claude 3 Sonnet', value: 'claude-3-sonnet-20240229' },
-                                    { label: 'Claude 3 Haiku', value: 'claude-3-haiku-20240307' }
-                                ];
-                                case 'google': return [
-                                    { label: 'Gemini 1.5 Pro', value: 'models/gemini-1.5-pro-latest' },
-                                    { label: 'Gemini Pro', value: 'models/gemini-pro' }
-                                ];
-                                case 'ollama': return [
-                                    { label: 'Llama 3', value: 'llama3' },
-                                    { label: 'Mistral', value: 'mistral' },
-                                    { label: 'Code Llama', value: 'codellama' }
-                                ];
-                                case 'openrouter': return [
-                                    { label: 'GPT-4o (OR)', value: 'openai/gpt-4o' },
-                                    { label: 'Claude 3 Opus (OR)', value: 'anthropic/claude-3-opus' },
-                                    { label: 'Gemini Pro 1.5 (OR)', value: 'google/gemini-pro-1.5' }
-                                ];
-                                default: return [];
-                            }
-                        };
-
-                        const activeProvider = user?.llmConfig?.activeProvider || 'openai';
-
-                        return (
-                            <Combobox
-                                value={customModelInput}
-                                onChange={setCustomModelInput}
-                                onBlur={() => updateUserConfig({ activeModel: customModelInput })}
-                                placeholder="Select or type model..."
-                                options={getModelOptions(activeProvider)}
-                                className="flex-1"
-                            />
-                        );
-                    })()}
-                </div>
-            </div>
-
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((msg) => (
                     <div
                         key={msg.id}
-                        className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'
-                            }`}
+                        className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                     >
                         <div
                             className={`max-w-[85%] rounded-lg p-3 text-sm ${msg.role === 'user'
